@@ -484,11 +484,11 @@ HTTP body, so decoding it as JSON will always fail. This is why `delete` and
 response, use `Json.Decode.decodeString`.
 
     type Msg
-        = HandleDeleteCat (WebData DeleteResponse)
+        = HandleDeleteCat (WebData String)
 
     deleteCat : Cat -> Cmd Msg
     deleteCat cat =
-        delete "/api/cats/" HandleDeleteCat deleteDecoder (encodeCat cat)
+        delete "/api/cats/" HandleDeleteCat (encodeCat cat)
 -}
 delete :
     String
