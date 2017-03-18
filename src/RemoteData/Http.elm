@@ -419,12 +419,38 @@ patch =
 deleteTaskWithConfig :
     Config
     -> String
-    -> Decoder success
     -> Json.Decode.Value
-    -> Task Never (WebData success)
-deleteTaskWithConfig config url decoder body =
-    request config "DELETE" url decoder (Http.jsonBody body)
+    -> Task Never (WebData String)
+deleteTaskWithConfig config url body =
+    Http.request
+        { method = "DELETE"
+        , headers = config.headers
+        , url = url
+        , body = Http.jsonBody body
+        , expect = Http.expectString
+        , timeout = config.timeout
+        , withCredentials = config.withCredentials
+        }
         |> toTask
+
+
+{-| `DELETE` request as a task, expecting a `String` response.
+
+In many APIs, the response for successful delete requests has an empty
+HTTP body, so decoding it as JSON will always fail. This is why `delete` and
+`deleteTask` don't have a decoder argument. If you really want to decode the
+response, use `Json.Decode.decodeString`.
+
+    deleteCatTask : Cat -> Task Never (WebData String)
+    deleteCatTask cat =
+        deleteTask "/api/cats/" (encodeCat cat)
+-}
+deleteTask :
+    String
+    -> Json.Decode.Value
+    -> Task Never (WebData String)
+deleteTask =
+    deleteTaskWithConfig defaultConfig
 
 
 {-| `DELETE` request as a command, with additional `Config`.
@@ -434,31 +460,28 @@ deleteTaskWithConfig config url decoder body =
 deleteWithConfig :
     Config
     -> String
-    -> (WebData success -> msg)
-    -> Decoder success
+    -> (WebData String -> msg)
     -> Json.Decode.Value
     -> Cmd msg
-deleteWithConfig config url tagger decoder body =
-    request config "DELETE" url decoder (Http.jsonBody body)
+deleteWithConfig config url tagger body =
+    Http.request
+        { method = "DELETE"
+        , headers = config.headers
+        , url = url
+        , body = Http.jsonBody body
+        , expect = Http.expectString
+        , timeout = config.timeout
+        , withCredentials = config.withCredentials
+        }
         |> toCmd tagger
 
 
-{-| `DELETE` request as a task.
+{-| `DELETE` request as a command, expecting a `String` response.
 
-    deleteCatTask : Cat -> Task Never (WebData Cat)
-    deleteCatTask cat =
-        deleteTask "/api/cats/" catDecoder (encodeCat cat)
--}
-deleteTask :
-    String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-deleteTask =
-    deleteTaskWithConfig defaultConfig
-
-
-{-| `DELETE` request as a command.
+In many APIs, the response for successful delete requests has an empty
+HTTP body, so decoding it as JSON will always fail. This is why `delete` and
+`deleteTask` don't have a decoder argument. If you really want to decode the
+response, use `Json.Decode.decodeString`.
 
     type Msg
         = HandleDeleteCat (WebData DeleteResponse)
@@ -469,8 +492,7 @@ deleteTask =
 -}
 delete :
     String
-    -> (WebData success -> msg)
-    -> Decoder success
+    -> (WebData String -> msg)
     -> Json.Decode.Value
     -> Cmd msg
 delete =
