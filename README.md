@@ -36,7 +36,7 @@ For more information, please refer to the package documentation for [`RemoteData
 
 ## Example usage
 
-Say we have a module called `Cat`, which has a definition for the type `Cat`, and a JSON decoder for that type. Using that module with `RemoteData.Http` looks like this:
+Using `RemoteData.Http` looks like this. Play with the code on [Ellie](https://embed.ellie-app.com/GgZxVXgpMda1/0).
 
 ```elm
 module Main exposing (..)
