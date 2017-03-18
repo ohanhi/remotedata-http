@@ -39,31 +39,37 @@ For more information, please refer to the package documentation for [`RemoteData
 Say we have a module called `Cat`, which has a definition for the type `Cat`, and a JSON decoder for that type. Using that module with `RemoteData.Http` looks like this:
 
 ```elm
-import Html exposing (button, text)
+module Main exposing (..)
+
+import Html exposing (Html, button, text)
 import Html.Events exposing (onClick)
+import Json.Decode
 import RemoteData exposing (RemoteData(..), WebData)
 import RemoteData.Http
-import Cat exposing (Cat) -- This is the module
 
 
--- Store the data as a `WebData a` type in your model
+{-| Store the data as a `WebData a` type in your model
+-}
 type alias Model =
     { cat : WebData Cat
     }
 
 
+{-| Add a message with a `WebData a` parameter
+-}
 type Msg
     = HandleCatResponse (WebData Cat)
     | GetCat
 
 
-init : (Model, Cmd Msg)
+init : ( Model, Cmd Msg )
 init =
     ( { cat = NotAsked }
     , Cmd.none
     )
 
-update : Msg -> Model -> (Model, Cmd Msg)
+
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         HandleCatResponse data ->
@@ -73,11 +79,11 @@ update msg model =
 
         GetCat ->
             ( model
-            , RemoteData.Http.get "/api/cats/1" HandleGetCat Cat.decoder
+            , RemoteData.Http.get "/api/cats/1" HandleCatResponse catDecoder
             )
 
 
-view : Model -> Html msg
+view : Model -> Html Msg
 view model =
     case model.cat of
         Loading ->
@@ -91,6 +97,26 @@ view model =
 
         NotAsked ->
             button [ onClick GetCat ] [ text "Get cat data from the server" ]
+
+
+main =
+    Html.program
+        { init = init
+        , update = update
+        , view = view
+        , subscriptions = \_ -> Sub.none
+        }
+
+
+{- This stuff is just to make it compile...
+Replace with your real type and decoder.
+-}
+type alias Cat =
+    {}
+
+
+catDecoder =
+    Json.Decode.fail "this isn't a real decoder"
 ```
 
 
