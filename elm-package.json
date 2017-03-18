@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
     "summary": "A collection of helper functions for server communication using RemoteData",
-    "repository": "https://github.com/user/project.git",
+    "repository": "https://github.com/ohanhi/remotedata-http.git",
     "license": "BSD3",
     "source-directories": [
         "src"
