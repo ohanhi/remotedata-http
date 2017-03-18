@@ -1,17 +1,25 @@
-module WebData.Http
+module RemoteData.Http
     exposing
         ( get
         , getWithConfig
         , post
+        , postWithConfig
         , put
+        , putWithConfig
         , patch
+        , patchWithConfig
         , delete
+        , deleteWithConfig
         , getTask
         , getTaskWithConfig
         , postTask
+        , postTaskWithConfig
         , putTask
+        , putTaskWithConfig
         , patchTask
+        , patchTaskWithConfig
         , deleteTask
+        , deleteTaskWithConfig
         , url
         , Config
         , defaultConfig
@@ -21,10 +29,20 @@ module WebData.Http
 {-| Friendly abstraction over remote API communication in JSON.
 
 # Commands
-@docs get, getWithCache, post, put, patch, delete
+@docs get, post, put, patch, delete
 
 # Tasks
-@docs getTask, getWithCacheTask, postTask, putTask, patchTask, deleteTask
+@docs getTask, postTask, putTask, patchTask, deleteTask
+
+# Additional configuration
+@docs Config, defaultConfig, noCacheConfig
+
+# Commands with configuration
+@docs getWithConfig, postWithConfig, putWithConfig, patchWithConfig, deleteWithConfig
+
+# Tasks with configuration
+@docs getTaskWithConfig, postTaskWithConfig, putTaskWithConfig, patchTaskWithConfig, deleteTaskWithConfig
+
 
 # Helpers
 @docs url
