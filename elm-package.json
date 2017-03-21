@@ -1,5 +1,5 @@
 {
-    "version": "2.0.1",
+    "version": "2.0.2",
     "summary": "A collection of helper functions for server communication using RemoteData",
     "repository": "https://github.com/ohanhi/remotedata-http.git",
     "license": "BSD3",
