@@ -78,7 +78,7 @@ update msg model =
             )
 
         GetCat ->
-            ( model
+            ( { model | cat = Loading }
             , RemoteData.Http.get "/api/cats/1" HandleCatResponse catDecoder
             )
 
