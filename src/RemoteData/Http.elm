@@ -60,6 +60,11 @@ noCache =
     Http.header "Cache-Control" "no-store, must-revalidate, no-cache, max-age=0"
 
 
+acceptJson : Header
+acceptJson =
+    Http.header "Accept" "application/json"
+
+
 {-| Convert an apiCall `Task` to a `Cmd msg` with the help of a
 tagger function (`WebData success -> msg`).
 -}
@@ -118,13 +123,13 @@ type alias Config =
 
 {-| The default configuration for all requests besides `GET`:
 
-- empty headers
+- accept application/json
 - without credentials
 - no timeout
 -}
 defaultConfig : Config
 defaultConfig =
-    { headers = []
+    { headers = [ acceptJson ]
     , withCredentials = False
     , timeout = Nothing
     }
@@ -133,12 +138,13 @@ defaultConfig =
 {-| The default configuration for `GET` requests:
 
 - a `no-cache` header
+- accept application/json
 - without credentials
 - no timeout
 -}
 noCacheConfig : Config
 noCacheConfig =
-    { defaultConfig | headers = [ noCache ] }
+    { defaultConfig | headers = noCache :: defaultConfig.headers }
 
 
 getRequest : Config -> String -> Decoder success -> Http.Request success
