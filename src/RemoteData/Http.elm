@@ -1,65 +1,86 @@
 module RemoteData.Http
     exposing
-        ( get
-        , getWithConfig
-        , post
-        , postWithConfig
-        , put
-        , putWithConfig
-        , patch
-        , patchWithConfig
+        ( Config
+        , acceptJson
+        , defaultConfig
         , delete
-        , deleteWithConfig
-        , getTask
-        , getTaskWithConfig
-        , postTask
-        , postTaskWithConfig
-        , putTask
-        , putTaskWithConfig
-        , patchTask
-        , patchTaskWithConfig
         , deleteTask
         , deleteTaskWithConfig
-        , url
-        , Config
-        , defaultConfig
+        , deleteWithConfig
+        , get
+        , getTask
+        , getTaskWithConfig
+        , getWithConfig
+        , noCache
         , noCacheConfig
+        , patch
+        , patchTask
+        , patchTaskWithConfig
+        , patchWithConfig
+        , post
+        , postTask
+        , postTaskWithConfig
+        , postWithConfig
+        , put
+        , putTask
+        , putTaskWithConfig
+        , putWithConfig
+        , url
         )
 
 {-| Friendly abstraction over remote API communication in JSON.
 
+
 # Commands
+
 @docs get, post, put, patch, delete
 
+
 # Tasks
+
 @docs getTask, postTask, putTask, patchTask, deleteTask
 
+
 # Additional configuration
+
 @docs Config, defaultConfig, noCacheConfig
 
+@docs noCache, acceptJson
+
+
 # Commands with configuration
+
 @docs getWithConfig, postWithConfig, putWithConfig, patchWithConfig, deleteWithConfig
 
+
 # Tasks with configuration
+
 @docs getTaskWithConfig, postTaskWithConfig, putTaskWithConfig, patchTaskWithConfig, deleteTaskWithConfig
 
 
 # Helpers
+
 @docs url
+
 -}
 
-import Http exposing (Header, Error, Response)
-import Task exposing (Task)
+import Http exposing (Error, Header, Response)
 import Json.Decode exposing (Decoder, Value)
 import RemoteData exposing (RemoteData(..), WebData)
+import Task exposing (Task)
 import Time
 
 
+{-| Header that makes sure the response doesn't come from a cache.
+Only relevant for GET requests.
+-}
 noCache : Header
 noCache =
     Http.header "Cache-Control" "no-store, must-revalidate, no-cache, max-age=0"
 
 
+{-| Header for explicitly stating we are expecting JSON back.
+-}
 acceptJson : Header
 acceptJson =
     Http.header "Accept" "application/json"
@@ -113,6 +134,7 @@ request config method url successDecoder body =
     postCat : Cat -> Cmd Msg
     postCat cat =
         postWithConfig specialConfig "/api/cats/" HandlePostCat catDecoder (encodeCat cat)
+
 -}
 type alias Config =
     { headers : List Header
@@ -123,9 +145,10 @@ type alias Config =
 
 {-| The default configuration for all requests besides `GET`:
 
-- accept application/json
-- without credentials
-- no timeout
+  - accept application/json
+  - without credentials
+  - no timeout
+
 -}
 defaultConfig : Config
 defaultConfig =
@@ -137,10 +160,11 @@ defaultConfig =
 
 {-| The default configuration for `GET` requests:
 
-- a `no-cache` header
-- accept application/json
-- without credentials
-- no timeout
+  - a `no-cache` header
+  - accept application/json
+  - without credentials
+  - no timeout
+
 -}
 noCacheConfig : Config
 noCacheConfig =
@@ -152,7 +176,7 @@ getRequest config url decoder =
     request config "GET" url decoder Http.emptyBody
 
 
-{-| `GET` request as a task, with additional `Config`. *NB.* allowing cache in API `GET` calls can lead
+{-| `GET` request as a task, with additional `Config`. _NB._ allowing cache in API `GET` calls can lead
 to strange conditions.
 
     getTaskWithConfig noCacheConfig "http://example.com/users.json" userDecoder
@@ -161,6 +185,7 @@ to strange conditions.
 For a request without any headers, you can use:
 
     getTaskWithConfig defaultConfig url decoder
+
 -}
 getTaskWithConfig : Config -> String -> Decoder success -> Task Never (WebData success)
 getTaskWithConfig config url decoder =
@@ -168,7 +193,7 @@ getTaskWithConfig config url decoder =
         |> toTask
 
 
-{-| `GET` request as a command, with cache. *NB.* allowing cache in API `GET` calls can lead
+{-| `GET` request as a command, with cache. _NB._ allowing cache in API `GET` calls can lead
 to strange conditions.
 
     getWithConfig noCacheConfig "http://example.com/users.json" userDecoder
@@ -177,6 +202,7 @@ to strange conditions.
 For a request without any headers, you can use:
 
     getWithConfig defaultConfig url decoder
+
 -}
 getWithConfig : Config -> String -> (WebData success -> msg) -> Decoder success -> Cmd msg
 getWithConfig config url tagger decoder =
@@ -190,6 +216,7 @@ Has a `no-cache` header to ensure data integrity.
     getCatTask : Task Never (WebData Cat)
     getCatTask =
         getTask "/api/cats/1" catDecoder
+
 -}
 getTask : String -> Decoder success -> Task Never (WebData success)
 getTask =
@@ -205,6 +232,7 @@ Has a `no-cache` header to ensure data integrity.
     getCat : Cmd Msg
     getCat =
         get "/api/cats/1" HandleGetCat catDecoder
+
 -}
 get : String -> (WebData success -> msg) -> Decoder success -> Cmd msg
 get =
@@ -214,6 +242,7 @@ get =
 {-| `POST` request as a task, with additional `Config`.
 
     postTaskWithConfig defaultConfig == postTask
+
 -}
 postTaskWithConfig :
     Config
@@ -229,6 +258,7 @@ postTaskWithConfig config url decoder body =
 {-| `POST` request as a command, with additional `Config`.
 
     postWithConfig defaultConfig == postTask
+
 -}
 postWithConfig :
     Config
@@ -247,6 +277,7 @@ postWithConfig config url tagger decoder body =
     postCatTask : Cat -> Task Never (WebData Cat)
     postCatTask cat =
         postTask "/api/cats/" catDecoder (encodeCat cat)
+
 -}
 postTask :
     String
@@ -265,6 +296,7 @@ postTask =
     postCat : Cat -> Cmd Msg
     postCat cat =
         post "/api/cats/" HandlePostCat catDecoder (encodeCat cat)
+
 -}
 post :
     String
@@ -283,6 +315,7 @@ post =
 {-| `PUT` request as a task, with additional `Config`.
 
     putTaskWithConfig defaultConfig == putTask
+
 -}
 putTaskWithConfig :
     Config
@@ -298,6 +331,7 @@ putTaskWithConfig config url decoder body =
 {-| `PUT` request as a command, with additional `Config`.
 
     putWithConfig defaultConfig == putTask
+
 -}
 putWithConfig :
     Config
@@ -316,6 +350,7 @@ putWithConfig config url tagger decoder body =
     putCatTask : Cat -> Task Never (WebData Cat)
     putCatTask cat =
         putTask "/api/cats/" catDecoder (encodeCat cat)
+
 -}
 putTask :
     String
@@ -334,6 +369,7 @@ putTask =
     putCat : Cat -> Cmd Msg
     putCat cat =
         put "/api/cats/" HandlePutCat catDecoder (encodeCat cat)
+
 -}
 put :
     String
@@ -352,6 +388,7 @@ put =
 {-| `PATCH` request as a task, with additional `Config`.
 
     patchTaskWithConfig defaultConfig == patchTask
+
 -}
 patchTaskWithConfig :
     Config
@@ -367,6 +404,7 @@ patchTaskWithConfig config url decoder body =
 {-| `PATCH` request as a command, with additional `Config`.
 
     patchWithConfig defaultConfig == patchTask
+
 -}
 patchWithConfig :
     Config
@@ -385,6 +423,7 @@ patchWithConfig config url tagger decoder body =
     patchCatTask : Cat -> Task Never (WebData Cat)
     patchCatTask cat =
         patchTask "/api/cats/" catDecoder (encodeCat cat)
+
 -}
 patchTask :
     String
@@ -403,6 +442,7 @@ patchTask =
     patchCat : Cat -> Cmd Msg
     patchCat cat =
         patch "/api/cats/" HandlePatchCat catDecoder (encodeCat cat)
+
 -}
 patch :
     String
@@ -421,6 +461,7 @@ patch =
 {-| `DELETE` request as a task, with additional `Config`.
 
     deleteTaskWithConfig defaultConfig == deleteTask
+
 -}
 deleteTaskWithConfig :
     Config
@@ -450,6 +491,7 @@ response, use `Json.Decode.decodeString`.
     deleteCatTask : Cat -> Task Never (WebData String)
     deleteCatTask cat =
         deleteTask "/api/cats/" (encodeCat cat)
+
 -}
 deleteTask :
     String
@@ -462,6 +504,7 @@ deleteTask =
 {-| `DELETE` request as a command, with additional `Config`.
 
     deleteWithConfig defaultConfig == deleteTask
+
 -}
 deleteWithConfig :
     Config
@@ -495,6 +538,7 @@ response, use `Json.Decode.decodeString`.
     deleteCat : Cat -> Cmd Msg
     deleteCat cat =
         delete "/api/cats/" HandleDeleteCat (encodeCat cat)
+
 -}
 delete :
     String
@@ -512,9 +556,11 @@ the portion of the URL before the query string, which is assumed to be
 properly encoded already. The second argument is a list of all the
 key/value pairs needed for the query string. Both the keys and values
 will be appropriately encoded, so they can contain spaces, ampersands, etc.
-[qs]: http://en.wikipedia.org/wiki/Query_string
-    url "http://example.com/users" [ ("name", "john doe"), ("age", "30") ]
-    -- http://example.com/users?name=john+doe&age=30
+[qs]: <http://en.wikipedia.org/wiki/Query_string>
+
+    url "<http://example.com/users"> [ ("name", "john doe"), ("age", "30") ]
+    --> "http://example.com/users?name=john+doe&age=30"
+
 -}
 url : String -> List ( String, String ) -> String
 url baseUrl args =
