@@ -25,7 +25,6 @@ module RemoteData.Http
         , putTask
         , putTaskWithConfig
         , putWithConfig
-        , url
         )
 
 {-| Friendly abstraction over remote API communication in JSON.
@@ -60,7 +59,7 @@ module RemoteData.Http
 
 # Helpers
 
-@docs url
+Use `elm-lang/url` in place of the old `url` helper.
 
 -}
 
@@ -68,7 +67,6 @@ import Http exposing (Error, Header, Response)
 import Json.Decode exposing (Decoder, Value)
 import RemoteData exposing (RemoteData(..), WebData)
 import Task exposing (Task)
-import Time
 
 
 {-| Header that makes sure the response doesn't come from a cache.
@@ -102,14 +100,14 @@ toTask request =
         |> Task.onError (Task.succeed << Failure)
 
 
-request :
+createRequest :
     Config
     -> String
     -> String
     -> Decoder success
     -> Http.Body
     -> Http.Request success
-request config method url successDecoder body =
+createRequest config method url successDecoder body =
     Http.request
         { method = method
         , headers = config.headers
@@ -139,7 +137,7 @@ request config method url successDecoder body =
 type alias Config =
     { headers : List Header
     , withCredentials : Bool
-    , timeout : Maybe Time.Time
+    , timeout : Maybe Float
     }
 
 
@@ -173,7 +171,7 @@ noCacheConfig =
 
 getRequest : Config -> String -> Decoder success -> Http.Request success
 getRequest config url decoder =
-    request config "GET" url decoder Http.emptyBody
+    createRequest config "GET" url decoder Http.emptyBody
 
 
 {-| `GET` request as a task, with additional `Config`. _NB._ allowing cache in API `GET` calls can lead
@@ -251,7 +249,7 @@ postTaskWithConfig :
     -> Json.Decode.Value
     -> Task Never (WebData success)
 postTaskWithConfig config url decoder body =
-    request config "POST" url decoder (Http.jsonBody body)
+    createRequest config "POST" url decoder (Http.jsonBody body)
         |> toTask
 
 
@@ -268,7 +266,7 @@ postWithConfig :
     -> Json.Decode.Value
     -> Cmd msg
 postWithConfig config url tagger decoder body =
-    request config "POST" url decoder (Http.jsonBody body)
+    createRequest config "POST" url decoder (Http.jsonBody body)
         |> toCmd tagger
 
 
@@ -324,7 +322,7 @@ putTaskWithConfig :
     -> Json.Decode.Value
     -> Task Never (WebData success)
 putTaskWithConfig config url decoder body =
-    request config "PUT" url decoder (Http.jsonBody body)
+    createRequest config "PUT" url decoder (Http.jsonBody body)
         |> toTask
 
 
@@ -341,7 +339,7 @@ putWithConfig :
     -> Json.Decode.Value
     -> Cmd msg
 putWithConfig config url tagger decoder body =
-    request config "PUT" url decoder (Http.jsonBody body)
+    createRequest config "PUT" url decoder (Http.jsonBody body)
         |> toCmd tagger
 
 
@@ -397,7 +395,7 @@ patchTaskWithConfig :
     -> Json.Decode.Value
     -> Task Never (WebData success)
 patchTaskWithConfig config url decoder body =
-    request config "PATCH" url decoder (Http.jsonBody body)
+    createRequest config "PATCH" url decoder (Http.jsonBody body)
         |> toTask
 
 
@@ -414,7 +412,7 @@ patchWithConfig :
     -> Json.Decode.Value
     -> Cmd msg
 patchWithConfig config url tagger decoder body =
-    request config "PATCH" url decoder (Http.jsonBody body)
+    createRequest config "PATCH" url decoder (Http.jsonBody body)
         |> toCmd tagger
 
 
@@ -547,36 +545,3 @@ delete :
     -> Cmd msg
 delete =
     deleteWithConfig defaultConfig
-
-
-{-| This is the old `url` function from evancz/elm-http.
-
-Create a properly encoded URL with a [query string][qs]. The first argument is
-the portion of the URL before the query string, which is assumed to be
-properly encoded already. The second argument is a list of all the
-key/value pairs needed for the query string. Both the keys and values
-will be appropriately encoded, so they can contain spaces, ampersands, etc.
-[qs]: <http://en.wikipedia.org/wiki/Query_string>
-
-    url "<http://example.com/users"> [ ("name", "john doe"), ("age", "30") ]
-    --> "http://example.com/users?name=john+doe&age=30"
-
--}
-url : String -> List ( String, String ) -> String
-url baseUrl args =
-    case args of
-        [] ->
-            baseUrl
-
-        _ ->
-            baseUrl ++ "?" ++ String.join "&" (List.map queryPair args)
-
-
-queryPair : ( String, String ) -> String
-queryPair ( key, value ) =
-    queryEscape key ++ "=" ++ queryEscape value
-
-
-queryEscape : String -> String
-queryEscape string =
-    String.join "+" (String.split "%20" (Http.encodeUri string))

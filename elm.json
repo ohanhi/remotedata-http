@@ -1,0 +1,20 @@
+{
+    "type": "package",
+    "name": "ohanhi/remotedata-http",
+    "summary": "A collection of helper functions for server communication using RemoteData",
+    "license": "BSD-3-Clause",
+    "version": "3.0.0",
+    "exposed-modules": [
+        "RemoteData.Http"
+    ],
+    "elm-version": "0.19.0 <= v < 0.20.0",
+    "dependencies": {
+        "elm-lang/core": "6.0.0 <= v < 7.0.0",
+        "elm-lang/html": "3.0.0 <= v < 4.0.0",
+        "elm-lang/http": "2.0.0 <= v < 3.0.0",
+        "elm-lang/json": "1.0.0 <= v < 2.0.0",
+        "elm-lang/time": "1.0.0 <= v < 2.0.0",
+        "krisajenkins/remotedata": "5.0.0 <= v < 6.0.0"
+    },
+    "test-dependencies": {}
+}
