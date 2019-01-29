@@ -3,7 +3,7 @@
     "name": "ohanhi/remotedata-http",
     "summary": "A collection of helper functions for server communication using RemoteData",
     "license": "BSD-3-Clause",
-    "version": "3.0.0",
+    "version": "4.0.0",
     "exposed-modules": [
         "RemoteData.Http"
     ],
