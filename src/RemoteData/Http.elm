@@ -1,31 +1,12 @@
-module RemoteData.Http
-    exposing
-        ( Config
-        , acceptJson
-        , defaultConfig
-        , delete
-        , deleteTask
-        , deleteTaskWithConfig
-        , deleteWithConfig
-        , get
-        , getTask
-        , getTaskWithConfig
-        , getWithConfig
-        , noCache
-        , noCacheConfig
-        , patch
-        , patchTask
-        , patchTaskWithConfig
-        , patchWithConfig
-        , post
-        , postTask
-        , postTaskWithConfig
-        , postWithConfig
-        , put
-        , putTask
-        , putTaskWithConfig
-        , putWithConfig
-        )
+module RemoteData.Http exposing
+    ( get, post, put, patch, delete
+    , noCache, acceptJson
+    , Config, defaultConfig, noCacheConfig
+    , getWithConfig, postWithConfig, putWithConfig, patchWithConfig, deleteWithConfig
+    , getTask, postTask, putTask, patchTask, deleteTask
+    , TaskConfig, defaultTaskConfig, noCacheTaskConfig
+    , getTaskWithConfig, postTaskWithConfig, putTaskWithConfig, patchTaskWithConfig, deleteTaskWithConfig
+    )
 
 {-| Friendly abstraction over remote API communication in JSON.
 
@@ -35,36 +16,36 @@ module RemoteData.Http
 @docs get, post, put, patch, delete
 
 
-# Tasks
-
-@docs getTask, postTask, putTask, patchTask, deleteTask
-
-
-# Additional configuration
-
-@docs Config, defaultConfig, noCacheConfig
+# Helpful headers
 
 @docs noCache, acceptJson
 
 
 # Commands with configuration
 
+@docs Config, defaultConfig, noCacheConfig
+
 @docs getWithConfig, postWithConfig, putWithConfig, patchWithConfig, deleteWithConfig
+
+
+# Tasks
+
+These should be rather rarely used.
+
+@docs getTask, postTask, putTask, patchTask, deleteTask
 
 
 # Tasks with configuration
 
+@docs TaskConfig, defaultTaskConfig, noCacheTaskConfig
+
 @docs getTaskWithConfig, postTaskWithConfig, putTaskWithConfig, patchTaskWithConfig, deleteTaskWithConfig
-
-
-# Helpers
-
-Use `elm-lang/url` in place of the old `url` helper.
 
 -}
 
 import Http exposing (Error, Header, Response)
-import Json.Decode exposing (Decoder, Value)
+import Json.Decode exposing (Decoder)
+import Json.Encode
 import RemoteData exposing (RemoteData(..), WebData)
 import Task exposing (Task)
 
@@ -84,50 +65,12 @@ acceptJson =
     Http.header "Accept" "application/json"
 
 
-{-| Convert an apiCall `Task` to a `Cmd msg` with the help of a
-tagger function (`WebData success -> msg`).
--}
-toCmd : (WebData success -> msg) -> Http.Request success -> Cmd msg
-toCmd tagger =
-    Http.send (tagger << RemoteData.fromResult)
-
-
-toTask : Http.Request success -> Task Never (WebData success)
-toTask request =
-    request
-        |> Http.toTask
-        |> Task.map Success
-        |> Task.onError (Task.succeed << Failure)
-
-
-createRequest :
-    Config
-    -> String
-    -> String
-    -> Decoder success
-    -> Http.Body
-    -> Http.Request success
-createRequest config method url successDecoder body =
-    Http.request
-        { method = method
-        , headers = config.headers
-        , url = url
-        , body = body
-        , expect = Http.expectJson successDecoder
-        , timeout = config.timeout
-        , withCredentials = config.withCredentials
-        }
-
-
 {-| If you need more control over the request, you can use the
 `<verb>WithConfig` function with a record like this.
 
     specialConfig : Config
     specialConfig =
-        { headers = [ specialHeader, anotherHeader ]
-        , withCredentials = True
-        , timeout = Nothing
-        }
+        { defaultConfig | headers = [ specialHeader, anotherHeader ] }
 
     postCat : Cat -> Cmd Msg
     postCat cat =
@@ -136,23 +79,26 @@ createRequest config method url successDecoder body =
 -}
 type alias Config =
     { headers : List Header
-    , withCredentials : Bool
     , timeout : Maybe Float
+    , tracker : Maybe String
+    , risky : Bool
     }
 
 
 {-| The default configuration for all requests besides `GET`:
 
   - accept application/json
-  - without credentials
   - no timeout
+  - no tracker
+  - not a risky request
 
 -}
 defaultConfig : Config
 defaultConfig =
     { headers = [ acceptJson ]
-    , withCredentials = False
     , timeout = Nothing
+    , tracker = Nothing
+    , risky = False
     }
 
 
@@ -162,6 +108,8 @@ defaultConfig =
   - accept application/json
   - without credentials
   - no timeout
+  - no tracker
+  - not a risky request
 
 -}
 noCacheConfig : Config
@@ -169,33 +117,11 @@ noCacheConfig =
     { defaultConfig | headers = noCache :: defaultConfig.headers }
 
 
-getRequest : Config -> String -> Decoder success -> Http.Request success
-getRequest config url decoder =
-    createRequest config "GET" url decoder Http.emptyBody
-
-
-{-| `GET` request as a task, with additional `Config`. _NB._ allowing cache in API `GET` calls can lead
-to strange conditions.
-
-    getTaskWithConfig noCacheConfig "http://example.com/users.json" userDecoder
-      == getTask "http://example.com/users.json" userDecoder
-
-For a request without any headers, you can use:
-
-    getTaskWithConfig defaultConfig url decoder
-
--}
-getTaskWithConfig : Config -> String -> Decoder success -> Task Never (WebData success)
-getTaskWithConfig config url decoder =
-    getRequest config url decoder
-        |> toTask
-
-
 {-| `GET` request as a command, with cache. _NB._ allowing cache in API `GET` calls can lead
 to strange conditions.
 
     getWithConfig noCacheConfig "http://example.com/users.json" userDecoder
-      == get "http://example.com/users.json" userDecoder
+        == get "http://example.com/users.json" userDecoder
 
 For a request without any headers, you can use:
 
@@ -204,21 +130,7 @@ For a request without any headers, you can use:
 -}
 getWithConfig : Config -> String -> (WebData success -> msg) -> Decoder success -> Cmd msg
 getWithConfig config url tagger decoder =
-    getRequest config url decoder
-        |> toCmd tagger
-
-
-{-| `GET` request as a task.
-Has a `no-cache` header to ensure data integrity.
-
-    getCatTask : Task Never (WebData Cat)
-    getCatTask =
-        getTask "/api/cats/1" catDecoder
-
--}
-getTask : String -> Decoder success -> Task Never (WebData success)
-getTask =
-    getTaskWithConfig noCacheConfig
+    request "GET" config url tagger decoder Http.emptyBody
 
 
 {-| `GET` request as a command.
@@ -237,25 +149,35 @@ get =
     getWithConfig noCacheConfig
 
 
-{-| `POST` request as a task, with additional `Config`.
+performRequest { risky } =
+    if risky then
+        Http.riskyRequest
 
-    postTaskWithConfig defaultConfig == postTask
+    else
+        Http.request
 
--}
-postTaskWithConfig :
-    Config
-    -> String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-postTaskWithConfig config url decoder body =
-    createRequest config "POST" url decoder (Http.jsonBody body)
-        |> toTask
+
+request : String -> Config -> String -> (WebData success -> msg) -> Decoder success -> Http.Body -> Cmd msg
+request method config url tagger decoder body =
+    performRequest config
+        { method = method
+        , headers = config.headers
+        , url = url
+        , body = body
+        , expect = Http.expectJson (RemoteData.fromResult >> tagger) decoder
+        , timeout = config.timeout
+        , tracker = config.tracker
+        }
+
+
+requestWithJson : String -> Config -> String -> (WebData success -> msg) -> Decoder success -> Json.Encode.Value -> Cmd msg
+requestWithJson method config url tagger decoder body =
+    request method config url tagger decoder (Http.jsonBody body)
 
 
 {-| `POST` request as a command, with additional `Config`.
 
-    postWithConfig defaultConfig == postTask
+    postWithConfig defaultConfig == post
 
 -}
 postWithConfig :
@@ -263,27 +185,10 @@ postWithConfig :
     -> String
     -> (WebData success -> msg)
     -> Decoder success
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
-postWithConfig config url tagger decoder body =
-    createRequest config "POST" url decoder (Http.jsonBody body)
-        |> toCmd tagger
-
-
-{-| `POST` request as a task.
-
-    postCatTask : Cat -> Task Never (WebData Cat)
-    postCatTask cat =
-        postTask "/api/cats/" catDecoder (encodeCat cat)
-
--}
-postTask :
-    String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-postTask =
-    postTaskWithConfig defaultConfig
+postWithConfig =
+    requestWithJson "POST"
 
 
 {-| `POST` request as a command.
@@ -300,7 +205,7 @@ post :
     String
     -> (WebData success -> msg)
     -> Decoder success
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
 post =
     postWithConfig defaultConfig
@@ -308,22 +213,6 @@ post =
 
 
 ----
-
-
-{-| `PUT` request as a task, with additional `Config`.
-
-    putTaskWithConfig defaultConfig == putTask
-
--}
-putTaskWithConfig :
-    Config
-    -> String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-putTaskWithConfig config url decoder body =
-    createRequest config "PUT" url decoder (Http.jsonBody body)
-        |> toTask
 
 
 {-| `PUT` request as a command, with additional `Config`.
@@ -336,27 +225,10 @@ putWithConfig :
     -> String
     -> (WebData success -> msg)
     -> Decoder success
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
-putWithConfig config url tagger decoder body =
-    createRequest config "PUT" url decoder (Http.jsonBody body)
-        |> toCmd tagger
-
-
-{-| `PUT` request as a task.
-
-    putCatTask : Cat -> Task Never (WebData Cat)
-    putCatTask cat =
-        putTask "/api/cats/" catDecoder (encodeCat cat)
-
--}
-putTask :
-    String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-putTask =
-    putTaskWithConfig defaultConfig
+putWithConfig =
+    requestWithJson "PUT"
 
 
 {-| `PUT` request as a command.
@@ -373,7 +245,7 @@ put :
     String
     -> (WebData success -> msg)
     -> Decoder success
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
 put =
     putWithConfig defaultConfig
@@ -381,22 +253,6 @@ put =
 
 
 ----
-
-
-{-| `PATCH` request as a task, with additional `Config`.
-
-    patchTaskWithConfig defaultConfig == patchTask
-
--}
-patchTaskWithConfig :
-    Config
-    -> String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-patchTaskWithConfig config url decoder body =
-    createRequest config "PATCH" url decoder (Http.jsonBody body)
-        |> toTask
 
 
 {-| `PATCH` request as a command, with additional `Config`.
@@ -409,27 +265,10 @@ patchWithConfig :
     -> String
     -> (WebData success -> msg)
     -> Decoder success
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
-patchWithConfig config url tagger decoder body =
-    createRequest config "PATCH" url decoder (Http.jsonBody body)
-        |> toCmd tagger
-
-
-{-| `PATCH` request as a task.
-
-    patchCatTask : Cat -> Task Never (WebData Cat)
-    patchCatTask cat =
-        patchTask "/api/cats/" catDecoder (encodeCat cat)
-
--}
-patchTask :
-    String
-    -> Decoder success
-    -> Json.Decode.Value
-    -> Task Never (WebData success)
-patchTask =
-    patchTaskWithConfig defaultConfig
+patchWithConfig =
+    requestWithJson "PATCH"
 
 
 {-| `PATCH` request as a command.
@@ -446,7 +285,7 @@ patch :
     String
     -> (WebData success -> msg)
     -> Decoder success
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
 patch =
     patchWithConfig defaultConfig
@@ -454,49 +293,6 @@ patch =
 
 
 ----
-
-
-{-| `DELETE` request as a task, with additional `Config`.
-
-    deleteTaskWithConfig defaultConfig == deleteTask
-
--}
-deleteTaskWithConfig :
-    Config
-    -> String
-    -> Json.Decode.Value
-    -> Task Never (WebData String)
-deleteTaskWithConfig config url body =
-    Http.request
-        { method = "DELETE"
-        , headers = config.headers
-        , url = url
-        , body = Http.jsonBody body
-        , expect = Http.expectString
-        , timeout = config.timeout
-        , withCredentials = config.withCredentials
-        }
-        |> toTask
-
-
-{-| `DELETE` request as a task, expecting a `String` response.
-
-In many APIs, the response for successful delete requests has an empty
-HTTP body, so decoding it as JSON will always fail. This is why `delete` and
-`deleteTask` don't have a decoder argument. If you really want to decode the
-response, use `Json.Decode.decodeString`.
-
-    deleteCatTask : Cat -> Task Never (WebData String)
-    deleteCatTask cat =
-        deleteTask "/api/cats/" (encodeCat cat)
-
--}
-deleteTask :
-    String
-    -> Json.Decode.Value
-    -> Task Never (WebData String)
-deleteTask =
-    deleteTaskWithConfig defaultConfig
 
 
 {-| `DELETE` request as a command, with additional `Config`.
@@ -508,19 +304,18 @@ deleteWithConfig :
     Config
     -> String
     -> (WebData String -> msg)
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
 deleteWithConfig config url tagger body =
-    Http.request
+    performRequest config
         { method = "DELETE"
         , headers = config.headers
         , url = url
         , body = Http.jsonBody body
-        , expect = Http.expectString
+        , expect = Http.expectString (RemoteData.fromResult >> tagger)
         , timeout = config.timeout
-        , withCredentials = config.withCredentials
+        , tracker = config.tracker
         }
-        |> toCmd tagger
 
 
 {-| `DELETE` request as a command, expecting a `String` response.
@@ -541,7 +336,289 @@ response, use `Json.Decode.decodeString`.
 delete :
     String
     -> (WebData String -> msg)
-    -> Json.Decode.Value
+    -> Json.Encode.Value
     -> Cmd msg
 delete =
     deleteWithConfig defaultConfig
+
+
+
+--- TASKS
+
+
+{-| If you need more control over the request, you can use the
+`<verb>TaskWithConfig` function with a record like this.
+
+    specialConfig : TaskConfig
+    specialConfig =
+        { defaultConfig | headers = [ specialHeader, anotherHeader ] }
+
+    postCatTask cat =
+        postTaskWithConfig specialConfig "/api/cats/" HandlePostCat catDecoder (encodeCat cat)
+
+-}
+type alias TaskConfig =
+    { headers : List Header
+    , timeout : Maybe Float
+    , risky : Bool
+    }
+
+
+{-| The default configuration for all requests besides `GET`:
+
+  - accept application/json
+  - no timeout
+  - not a risky request
+
+-}
+defaultTaskConfig : TaskConfig
+defaultTaskConfig =
+    { headers = [ acceptJson ]
+    , timeout = Nothing
+    , risky = False
+    }
+
+
+{-| The default configuration for `GET` requests:
+
+  - a `no-cache` header
+  - accept application/json
+  - without credentials
+  - no timeout
+  - not a risky request
+
+-}
+noCacheTaskConfig : TaskConfig
+noCacheTaskConfig =
+    { defaultTaskConfig | headers = noCache :: defaultConfig.headers }
+
+
+createTask { risky } =
+    if risky then
+        Http.riskyTask
+
+    else
+        Http.task
+
+
+requestTask : String -> TaskConfig -> String -> Decoder success -> Http.Body -> Task () (WebData success)
+requestTask method config url decoder body =
+    createTask config
+        { method = method
+        , url = url
+        , headers = config.headers
+        , body = body
+        , timeout = config.timeout
+        , resolver = jsonResolver decoder
+        }
+
+
+requestTaskWithJson : String -> TaskConfig -> String -> Decoder success -> Json.Encode.Value -> Task () (WebData success)
+requestTaskWithJson method config url decoder body =
+    requestTask method config url decoder (Http.jsonBody body)
+
+
+{-| `GET` request as a task, with additional `Config`. _NB._ allowing cache in API `GET` calls can lead
+to strange conditions.
+
+    getTaskWithConfig noCacheConfig "http://example.com/users.json" userDecoder
+        == getTask "http://example.com/users.json" userDecoder
+
+For a request without any headers, you can use:
+
+    getTaskWithConfig defaultTaskConfig url decoder
+
+-}
+getTaskWithConfig : TaskConfig -> String -> Decoder success -> Task () (WebData success)
+getTaskWithConfig config url decoder =
+    requestTask "GET" config url decoder Http.emptyBody
+
+
+{-| `GET` request as a task.
+Has a `no-cache` header to ensure data integrity.
+
+    getCatTask : Task () (WebData Cat)
+    getCatTask =
+        getTask "/api/cats/1" catDecoder
+
+-}
+getTask : String -> Decoder success -> Task () (WebData success)
+getTask =
+    getTaskWithConfig noCacheTaskConfig
+
+
+{-| `POST` request as a task, with additional `Config`.
+
+    postTaskWithConfig defaultTaskConfig == postTask
+
+-}
+postTaskWithConfig :
+    TaskConfig
+    -> String
+    -> Decoder success
+    -> Json.Encode.Value
+    -> Task () (WebData success)
+postTaskWithConfig =
+    requestTaskWithJson "POST"
+
+
+{-| `POST` request as a task.
+
+    postCatTask : Cat -> Task () (WebData Cat)
+    postCatTask cat =
+        postTask "/api/cats/" catDecoder (encodeCat cat)
+
+-}
+postTask :
+    String
+    -> Decoder success
+    -> Json.Decode.Value
+    -> Task () (WebData success)
+postTask =
+    postTaskWithConfig defaultTaskConfig
+
+
+{-| `PUT` request as a task, with additional `Config`.
+
+    putTaskWithConfig defaultTaskConfig == putTask
+
+-}
+putTaskWithConfig :
+    TaskConfig
+    -> String
+    -> Decoder success
+    -> Json.Encode.Value
+    -> Task () (WebData success)
+putTaskWithConfig =
+    requestTaskWithJson "PUT"
+
+
+{-| `PUT` request as a task.
+
+    putCatTask : Cat -> Task () (WebData Cat)
+    putCatTask cat =
+        putTask "/api/cats/" catDecoder (encodeCat cat)
+
+-}
+putTask :
+    String
+    -> Decoder success
+    -> Json.Decode.Value
+    -> Task () (WebData success)
+putTask =
+    putTaskWithConfig defaultTaskConfig
+
+
+{-| `PATCH` request as a task, with additional `Config`.
+
+    patchTaskWithConfig defaultTaskConfig == patchTask
+
+-}
+patchTaskWithConfig :
+    TaskConfig
+    -> String
+    -> Decoder success
+    -> Json.Encode.Value
+    -> Task () (WebData success)
+patchTaskWithConfig =
+    requestTaskWithJson "PATCH"
+
+
+{-| `PATCH` request as a task.
+
+    patchCatTask : Cat -> Task () (WebData Cat)
+    patchCatTask cat =
+        patchTask "/api/cats/" catDecoder (encodeCat cat)
+
+-}
+patchTask :
+    String
+    -> Decoder success
+    -> Json.Decode.Value
+    -> Task () (WebData success)
+patchTask =
+    patchTaskWithConfig defaultTaskConfig
+
+
+{-| `DELETE` request as a task, with additional `Config`.
+
+    deleteTaskWithConfig defaultTaskConfig == deleteTask
+
+-}
+deleteTaskWithConfig :
+    TaskConfig
+    -> String
+    -> Json.Decode.Value
+    -> Task () (WebData String)
+deleteTaskWithConfig config url body =
+    createTask config
+        { method = "DELETE"
+        , headers = config.headers
+        , url = url
+        , body = Http.jsonBody body
+        , resolver = stringResolver
+        , timeout = config.timeout
+        }
+
+
+{-| `DELETE` request as a task, expecting a `String` response.
+In many APIs, the response for successful delete requests has an empty
+HTTP body, so decoding it as JSON will always fail. This is why `delete` and
+`deleteTask` don't have a decoder argument. If you really want to decode the
+response, use `Json.Decode.decodeString`.
+
+    deleteCatTask : Cat -> Task () (WebData String)
+    deleteCatTask cat =
+        deleteTask "/api/cats/" (encodeCat cat)
+
+-}
+deleteTask :
+    String
+    -> Json.Decode.Value
+    -> Task () (WebData String)
+deleteTask =
+    deleteTaskWithConfig defaultTaskConfig
+
+
+stringResolver : Http.Resolver () (WebData String)
+stringResolver =
+    taskResolver (Ok << Success)
+
+
+jsonResolver : Decoder success -> Http.Resolver () (WebData success)
+jsonResolver decoder =
+    taskResolver <|
+        \body ->
+            case Json.Decode.decodeString decoder body of
+                Ok value ->
+                    Ok (Success value)
+
+                Err err ->
+                    Ok (Failure (Http.BadBody (Json.Decode.errorToString err)))
+
+
+taskResolver :
+    (String -> Result () (WebData success))
+    -> Http.Resolver () (WebData success)
+taskResolver fromGoodStatus =
+    let
+        fail =
+            Ok << Failure
+    in
+    Http.stringResolver <|
+        \response ->
+            case response of
+                Http.BadUrl_ url ->
+                    fail (Http.BadUrl url)
+
+                Http.Timeout_ ->
+                    fail Http.Timeout
+
+                Http.NetworkError_ ->
+                    fail Http.NetworkError
+
+                Http.BadStatus_ metadata body ->
+                    fail (Http.BadStatus metadata.statusCode)
+
+                Http.GoodStatus_ metadata body ->
+                    fromGoodStatus body
